@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dopamine Beads - 拼豆图纸生成器</title>
+<style>
+/* ===== CSS Reset & Variables ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --primary: #FF4D6D;
+  --primary-dark: #E63950;
+  --secondary: #FFD93D;
+  --accent: #00F5D4;
+  --accent-dark: #00C4A8;
+  --bg-start: #1a1a2e;
+  --bg-mid: #16213e;
+  --bg-end: #0f3460;
+  --surface: rgba(255,255,255,0.06);
+  --surface-hover: rgba(255,255,255,0.1);
+  --text: #f0f0f0;
+  --text-muted: #a0a0b8;
+  --text-bright: #ffffff;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 8px 32px rgba(0,0,0,0.3);
+  --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ===== Base ===== */
+body {
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-mid) 40%, var(--bg-end) 100%);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Animated background blobs */
+.bg-blobs {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+}
+.bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.25;
+  animation: blobFloat 20s ease-in-out infinite;
+}
+.bg-blob:nth-child(1) {
+  width: 500px; height: 500px;
+  background: var(--primary);
+  top: -150px; left: -100px;
+  animation-delay: 0s;
+}
+.bg-blob:nth-child(2) {
+  width: 400px; height: 400px;
+  background: var(--secondary);
+  top: 40%; right: -120px;
+  animation-delay: -5s;
+}
+.bg-blob:nth-child(3) {
+  width: 450px; height: 450px;
+  background: var(--accent);
+  bottom: -180px; left: 30%;
+  animation-delay: -10s;
+}
+@keyframes blobFloat {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  25% { transform: translate(60px,-40px) scale(1.08); }
+  50% { transform: translate(-30px,50px) scale(0.94); }
+  75% { transform: translate(-50px,-30px) scale(1.04); }
+}
+
+/* ===== Layout ===== */
+.app-container {
+  position: relative; z-index: 1;
+  max-width: 1300px; margin: 0 auto; padding: 20px 24px 60px;
+}
+
+/* ===== Header ===== */
+.header {
+  text-align: center; padding: 40px 20px 30px;
+}
+.logo {
+  display: inline-flex; align-items: center; gap: 12px;
+  font-size: 2.4rem; font-weight: 900; letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--secondary), var(--primary), var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.logo-icon { font-size: 2.8rem; -webkit-text-fill-color: initial; }
+.tagline {
+  margin-top: 8px; font-size: 1.05rem; color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* ===== Card ===== */
+.card {
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  padding: 28px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+}
+.card-header {
+  font-size: 1.15rem; font-weight: 700; margin-bottom: 18px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-header .icon { font-size: 1.3rem; }
+
+/* ===== Upload Zone ===== */
+.upload-zone {
+  border: 2px dashed rgba(255,255,255,0.2);
+  border-radius: var(--radius);
+  padding: 50px 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  background: rgba(255,255,255,0.02);
+  position: relative;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--secondary);
+  background: rgba(255,217,61,0.06);
+  transform: translateY(-2px);
+}
+.upload-icon { font-size: 3.5rem; margin-bottom: 12px; display: block; }
+.upload-text { font-size: 1.1rem; font-weight: 600; color: var(--text-bright); }
+.upload-hint { font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; }
+.upload-zone input[type="file"] { position: absolute; top: 0; right: 0; bottom: 0; left: 0; inset: 0; opacity: 0; cursor: pointer; }
+
+/* ===== Controls ===== */
+.controls-row {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+}
+.control-group { display: flex; align-items: center; gap: 10px; }
+.control-group label {
+  font-size: 0.9rem; font-weight: 600; color: var(--text-muted);
+  white-space: nowrap;
+}
+.resolution-btn {
+  padding: 8px 18px; border-radius: 20px; border: 1.5px solid rgba(255,255,255,0.2);
+  background: transparent; color: var(--text); cursor: pointer;
+  font-size: 0.9rem; font-weight: 600; transition: var(--transition);
+}
+.resolution-btn:hover { border-color: var(--secondary); color: var(--secondary); }
+.resolution-btn.active {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+.resolution-custom {
+  width: 80px; padding: 8px 12px; border-radius: 20px;
+  border: 1.5px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06);
+  color: var(--text); font-size: 0.9rem; text-align: center;
+  transition: var(--transition);
+}
+.resolution-custom:focus { outline: none; border-color: var(--accent); }
+
+/* Toggle switches */
+.toggle-group { display: flex; flex-wrap: wrap; gap: 12px; margin-left: auto; }
+.toggle-item { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted); cursor: pointer; }
+.toggle-item input { accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer; }
+
+/* ===== Action Buttons ===== */
+.btn {
+  padding: 10px 24px; border-radius: 24px; border: none;
+  font-size: 0.95rem; font-weight: 700; cursor: pointer;
+  transition: var(--transition); display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff; box-shadow: 0 4px 16px rgba(255,77,109,0.35);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(255,77,109,0.5); }
+.btn-accent {
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #1a1a2e; box-shadow: 0 4px 16px rgba(0,245,212,0.25);
+}
+.btn-accent:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,245,212,0.4); }
+.btn-outline {
+  background: transparent; border: 1.5px solid rgba(255,255,255,0.25); color: var(--text);
+}
+.btn-outline:hover { border-color: var(--text-bright); background: var(--surface-hover); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+/* ===== Preview Panels ===== */
+.panels {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+.panel {
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.panel-title {
+  padding: 14px 20px; font-size: 0.9rem; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; gap: 8px;
+}
+.panel-body {
+  padding: 16px; display: flex; align-items: center; justify-content: center;
+  min-height: 300px; background: rgba(0,0,0,0.15);
+  position: relative; overflow: auto;
+}
+.panel-body canvas { max-width: 100%; height: auto; display: block; image-rendering: pixelated; }
+.panel-body img { max-width: 100%; max-height: 400px; object-fit: contain; }
+
+/* Bead grid specific */
+.bead-grid-wrapper {
+  overflow: auto; max-height: 600px;
+  display: flex; align-items: flex-start; justify-content: center;
+}
+.bead-grid-wrapper canvas { image-rendering: pixelated; }
+
+/* ===== Material List ===== */
+.material-grid {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  max-height: 400px; overflow-y: auto;
+  padding: 4px;
+}
+.material-item {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.05); border-radius: 20px;
+  padding: 5px 12px 5px 5px;
+  font-size: 0.8rem; font-weight: 600;
+  transition: var(--transition);
+  cursor: default;
+}
+.material-item:hover { background: rgba(255,255,255,0.12); transform: scale(1.03); }
+.material-swatch {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+.material-name { color: var(--text); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.material-count { color: var(--secondary); margin-left: auto; }
+
+.summary-stats {
+  display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.stat-item {
+  background: rgba(255,255,255,0.05); border-radius: var(--radius-sm);
+  padding: 14px 20px; text-align: center; min-width: 100px;
+}
+.stat-value { font-size: 1.6rem; font-weight: 900; color: var(--secondary); }
+.stat-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+/* ===== Empty State ===== */
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-muted);
+}
+.empty-state-icon { font-size: 3rem; display: block; margin-bottom: 12px; opacity: 0.5; }
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #1a1a2e; padding: 12px 28px;
+  border-radius: 28px; font-weight: 700; font-size: 0.9rem;
+  z-index: 100; opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0,245,212,0.3);
+}
+.toast.show { opacity: 1; }
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .header { padding: 24px 12px 16px; }
+  .logo { font-size: 1.6rem; }
+  .card { padding: 18px; }
+  .panels { grid-template-columns: 1fr; }
+  .controls-row { flex-direction: column; align-items: flex-start; }
+  .toggle-group { margin-left: 0; }
+}
+
+/* ===== Color distance method selector ===== */
+.method-select {
+  padding: 6px 12px; border-radius: 16px; border: 1.5px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.06); color: var(--text); font-size: 0.85rem;
+  cursor: pointer; transition: var(--transition);
+}
+.method-select:focus { outline: none; border-color: var(--accent); }
+.method-select option { background: var(--bg-mid); color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- Animated Background -->
+<div class="bg-blobs">
+  <div class="bg-blob"></div>
+  <div class="bg-blob"></div>
+  <div class="bg-blob"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- App -->
+<div class="app-container">
+
+  <!-- Header -->
+  <header class="header">
+    <h1 class="logo">
+      <span class="logo-icon">🖼️</span>Dopamine Beads
+    </h1>
+    <p class="tagline">将你的图片变成拼豆图纸 · 支持 Mard 221 标准色号 · 即拍即用</p>
+  </header>
+
+  <!-- Upload Section -->
+  <div class="card">
+    <div class="card-header"><span class="icon">📤</span>上传图片</div>
+    <div class="upload-zone" id="uploadZone">
+      <span class="upload-icon">🟡</span>
+      <div class="upload-text">拖拽图片到此处，或点击上传</div>
+      <div class="upload-hint">支持 JPG / PNG，建议使用清晰、色彩分明的图片</div>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="card" id="controlsCard" style="display:none;">
+    <div class="card-header"><span class="icon">🎛️</span>参数设置</div>
+    <div class="controls-row">
+      <div class="control-group">
+        <label>分辨率：</label>
+        <button class="resolution-btn" data-size="32">32</button>
+        <button class="resolution-btn" data-size="48">48</button>
+        <button class="resolution-btn active" data-size="64">64</button>
+        <button class="resolution-btn" data-size="96">96</button>
+        <button class="resolution-btn" data-size="128">128</button>
+        <input type="number" class="resolution-custom" id="customSize" placeholder="自定义" min="8" max="256">
+      </div>
+      <div class="control-group">
+        <label>匹配算法：</label>
+        <select class="method-select" id="matchMethod">
+          <option value="lab" selected>LAB 感知 (推荐)</option>
+          <option value="weighted">加权 RGB</option>
+          <option value="euclidean">欧几里得 RGB</option>
+        </select>
+      </div>
+      <div class="toggle-group">
+        <label class="toggle-item">
+          <input type="checkbox" id="toggleGrid" checked> 显示网格线
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="toggleLabels"> 显示色号
+        </label>
+      </div>
+      <button class="btn btn-outline" id="resetBtn">🔄 重新上传</button>
+    </div>
+  </div>
+
+  <!-- Preview Panels -->
+  <div class="panels" id="panelsContainer" style="display:none;">
+
+    <!-- Original Image -->
+    <div class="panel">
+      <div class="panel-title">📷 原图</div>
+      <div class="panel-body" id="originalPanel">
+        <div class="empty-state"><span class="empty-state-icon">📷</span>等待上传</div>
+      </div>
+    </div>
+
+    <!-- Pixelated Preview -->
+    <div class="panel">
+      <div class="panel-title">🔲 像素化预览</div>
+      <div class="panel-body" id="pixelatedPanel">
+        <div class="empty-state"><span class="empty-state-icon">🔲</span>等待处理</div>
+      </div>
+    </div>
+
+    <!-- Bead Grid -->
+    <div class="panel" style="grid-column: 1 / -1;">
+      <div class="panel-title">🧩 拼豆图纸 <span style="font-weight:400;font-size:0.8rem;color:var(--text-muted);" id="gridInfo"></span></div>
+      <div class="panel-body bead-grid-wrapper" id="beadGridPanel">
+        <div class="empty-state"><span class="empty-state-icon">🧩</span>等待生成</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Material List & Download -->
+  <div class="card" id="materialsCard" style="display:none;">
+    <div class="card-header"><span class="icon">📋</span>材料清单</div>
+    <div class="summary-stats" id="summaryStats"></div>
+    <div class="material-grid" id="materialGrid"></div>
+    <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
+      <button class="btn btn-accent" id="downloadGridBtn">📥 下载图纸 (PNG)</button>
+      <button class="btn btn-outline" id="downloadListBtn">📋 导出材料清单 (CSV)</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ======================================================================
+// MARD 221 标准色库
+// 基于常见拼豆颜色构建，涵盖白/黑/灰/红/粉/橙/黄/绿/蓝/紫/棕等色系
+// ======================================================================
+const MARD_PALETTE = [
+  // ── 白色 / 黑色 / 灰色系 (01-12) ──
+  { id:"C01", name:"纯白", rgb:[255,255,255] },
+  { id:"C02", name:"奶白", rgb:[250,248,240] },
+  { id:"C03", name:"象牙白", rgb:[255,251,235] },
+  { id:"C04", name:"浅米色", rgb:[245,240,225] },
+  { id:"C05", name:"纯黑", rgb:[30,30,30] },
+  { id:"C06", name:"炭黑", rgb:[50,50,50] },
+  { id:"C07", name:"深灰", rgb:[80,80,80] },
+  { id:"C08", name:"中灰", rgb:[130,130,130] },
+  { id:"C09", name:"浅灰", rgb:[180,180,180] },
+  { id:"C10", name:"银灰", rgb:[200,200,208] },
+  { id:"C11", name:"珍珠灰", rgb:[210,208,200] },
+  { id:"C12", name:"雾灰", rgb:[190,192,195] },
+
+  // ── 红色系 (13-28) ──
+  { id:"C13", name:"正红", rgb:[220,30,40] },
+  { id:"C14", name:"深红", rgb:[170,20,30] },
+  { id:"C15", name:"酒红", rgb:[140,25,40] },
+  { id:"C16", name:"暗红", rgb:[160,35,45] },
+  { id:"C17", name:"番茄红", rgb:[235,55,50] },
+  { id:"C18", name:"珊瑚红", rgb:[245,100,90] },
+  { id:"C19", name:"草莓红", rgb:[250,65,75] },
+  { id:"C20", name:"朱红", rgb:[230,75,55] },
+  { id:"C21", name:"砖红", rgb:[190,80,60] },
+  { id:"C22", name:"玫红", rgb:[220,30,100] },
+  { id:"C23", name:"桃红", rgb:[245,120,145] },
+  { id:"C24", name:"浅粉", rgb:[255,180,190] },
+  { id:"C25", name:"婴儿粉", rgb:[255,200,210] },
+  { id:"C26", name:"蜜桃粉", rgb:[255,175,160] },
+  { id:"C27", name:"荧光粉", rgb:[255,50,130] },
+  { id:"C28", name:"豆沙粉", rgb:[215,145,140] },
+
+  // ── 橙色系 (29-42) ──
+  { id:"C29", name:"正橙", rgb:[245,130,35] },
+  { id:"C30", name:"深橙", rgb:[220,100,20] },
+  { id:"C31", name:"亮橙", rgb:[255,150,40] },
+  { id:"C32", name:"荧光橙", rgb:[255,110,20] },
+  { id:"C33", name:"杏橙", rgb:[255,175,100] },
+  { id:"C34", name:"蜜橙", rgb:[250,160,70] },
+  { id:"C35", name:"三文鱼", rgb:[255,155,130] },
+  { id:"C36", name:"橘红", rgb:[240,115,60] },
+  { id:"C37", name:"南瓜橙", rgb:[245,140,45] },
+  { id:"C38", name:"琥珀", rgb:[235,155,50] },
+  { id:"C39", name:"金色", rgb:[240,195,45] },
+  { id:"C40", name:"古铜", rgb:[200,140,65] },
+  { id:"C41", name:"淡橙", rgb:[255,195,140] },
+  { id:"C42", name:"奶油橘", rgb:[255,210,155] },
+
+  // ── 黄色系 (43-56) ──
+  { id:"C43", name:"正黄", rgb:[250,215,30] },
+  { id:"C44", name:"明黄", rgb:[255,235,50] },
+  { id:"C45", name:"荧光黄", rgb:[240,245,30] },
+  { id:"C46", name:"柠檬黄", rgb:[245,240,70] },
+  { id:"C47", name:"浅黄", rgb:[255,245,145] },
+  { id:"C48", name:"奶油黄", rgb:[255,248,175] },
+  { id:"C49", name:"芥末黄", rgb:[210,185,55] },
+  { id:"C50", name:"土黄", rgb:[200,170,70] },
+  { id:"C51", name:"金黄", rgb:[245,200,40] },
+  { id:"C52", name:"蜂蜜黄", rgb:[245,210,80] },
+  { id:"C53", name:"香槟金", rgb:[240,215,130] },
+  { id:"C54", name:"鹅黄", rgb:[255,235,120] },
+  { id:"C55", name:"向日葵黄", rgb:[250,220,55] },
+  { id:"C56", name:"奶黄", rgb:[255,242,170] },
+
+  // ── 绿色系 (57-78) ──
+  { id:"C57", name:"正绿", rgb:[40,175,70] },
+  { id:"C58", name:"深绿", rgb:[25,120,55] },
+  { id:"C59", name:"墨绿", rgb:[20,80,55] },
+  { id:"C60", name:"森林绿", rgb:[35,135,75] },
+  { id:"C61", name:"草绿", rgb:[80,185,60] },
+  { id:"C62", name:"嫩绿", rgb:[130,210,70] },
+  { id:"C63", name:"荧光绿", rgb:[60,240,60] },
+  { id:"C64", name:"薄荷绿", rgb:[120,225,170] },
+  { id:"C65", name:"浅绿", rgb:[170,225,150] },
+  { id:"C66", name:"苹果绿", rgb:[145,210,60] },
+  { id:"C67", name:"橄榄绿", rgb:[130,145,70] },
+  { id:"C68", name:"军绿", rgb:[110,120,65] },
+  { id:"C69", name:"卡其绿", rgb:[155,165,115] },
+  { id:"C70", name:"苔绿", rgb:[100,140,90] },
+  { id:"C71", name:"湖绿", rgb:[55,195,165] },
+  { id:"C72", name:"松石绿", rgb:[35,185,155] },
+  { id:"C73", name:"翡翠绿", rgb:[30,190,140] },
+  { id:"C74", name:"碧绿", rgb:[45,200,150] },
+  { id:"C75", name:"竹绿", rgb:[110,190,95] },
+  { id:"C76", name:"柳绿", rgb:[160,210,120] },
+  { id:"C77", name:"青柠", rgb:[190,225,80] },
+  { id:"C78", name:"绿松石", rgb:[60,190,180] },
+
+  // ── 蓝绿色系 (79-90) ──
+  { id:"C79", name:"正青", rgb:[30,190,195] },
+  { id:"C80", name:"浅青", rgb:[120,225,225] },
+  { id:"C81", name:"水绿", rgb:[155,230,215] },
+  { id:"C82", name:"海绿", rgb:[80,205,195] },
+  { id:"C83", name:"孔雀绿", rgb:[25,170,160] },
+  { id:"C84", name:"蒂芙尼蓝", rgb:[110,215,200] },
+  { id:"C85", name:"薄荷青", rgb:[160,235,225] },
+  { id:"C86", name:"冰青", rgb:[195,240,235] },
+  { id:"C87", name:"湖水蓝", rgb:[65,200,210] },
+  { id:"C88", name:"碧青", rgb:[50,195,190] },
+  { id:"C89", name:"浅海绿", rgb:[140,220,210] },
+  { id:"C90", name:"玉色", rgb:[180,230,220] },
+
+  // ── 蓝色系 (91-112) ──
+  { id:"C91", name:"正蓝", rgb:[35,100,210] },
+  { id:"C92", name:"深蓝", rgb:[25,60,150] },
+  { id:"C93", name:"宝蓝", rgb:[30,80,220] },
+  { id:"C94", name:"亮蓝", rgb:[50,140,245] },
+  { id:"C95", name:"钴蓝", rgb:[40,100,225] },
+  { id:"C96", name:"海军蓝", rgb:[30,50,130] },
+  { id:"C97", name:"午夜蓝", rgb:[25,35,100] },
+  { id:"C98", name:"天蓝", rgb:[100,180,245] },
+  { id:"C99", name:"浅蓝", rgb:[165,210,250] },
+  { id:"C100", name:"婴儿蓝", rgb:[195,225,250] },
+  { id:"C101", name:"矢车菊蓝", rgb:[90,155,235] },
+  { id:"C102", name:"湖蓝", rgb:[60,160,225] },
+  { id:"C103", name:"蔚蓝", rgb:[45,175,240] },
+  { id:"C104", name:"荧光蓝", rgb:[40,130,250] },
+  { id:"C105", name:"冰蓝", rgb:[190,230,250] },
+  { id:"C106", name:"灰蓝", rgb:[120,155,200] },
+  { id:"C107", name:"钢蓝", rgb:[100,135,185] },
+  { id:"C108", name:"牛仔蓝", rgb:[80,120,190] },
+  { id:"C109", name:"靛蓝", rgb:[60,70,170] },
+  { id:"C110", name:"紫蓝", rgb:[90,75,195] },
+  { id:"C111", name:"薰衣草蓝", rgb:[155,170,230] },
+  { id:"C112", name:"粉蓝", rgb:[180,200,240] },
+
+  // ── 紫色系 (113-132) ──
+  { id:"C113", name:"正紫", rgb:[145,45,210] },
+  { id:"C114", name:"深紫", rgb:[105,30,170] },
+  { id:"C115", name:"葡萄紫", rgb:[120,45,185] },
+  { id:"C116", name:"亮紫", rgb:[170,65,235] },
+  { id:"C117", name:"薰衣草", rgb:[185,140,230] },
+  { id:"C118", name:"浅紫", rgb:[200,170,235] },
+  { id:"C119", name:"丁香紫", rgb:[210,185,235] },
+  { id:"C120", name:"紫罗兰", rgb:[160,100,225] },
+  { id:"C121", name:"兰花紫", rgb:[190,130,230] },
+  { id:"C122", name:"荧光紫", rgb:[180,40,240] },
+  { id:"C123", name:"梅紫", rgb:[155,55,195] },
+  { id:"C124", name:"茄紫", rgb:[80,35,140] },
+  { id:"C125", name:"淡紫", rgb:[215,195,240] },
+  { id:"C126", name:"藕荷色", rgb:[195,175,220] },
+  { id:"C127", name:"紫粉", rgb:[215,140,210] },
+  { id:"C128", name:"洋红紫", rgb:[200,60,175] },
+  { id:"C129", name:"紫红", rgb:[190,45,160] },
+  { id:"C130", name:"品红", rgb:[225,45,155] },
+  { id:"C131", name:"荧光玫红", rgb:[240,35,155] },
+  { id:"C132", name:"淡绯", rgb:[235,155,215] },
+
+  // ── 粉色系 (133-146) ──
+  { id:"C133", name:"亮粉", rgb:[245,100,165] },
+  { id:"C134", name:"热粉", rgb:[250,75,160] },
+  { id:"C135", name:"糖果粉", rgb:[255,140,185] },
+  { id:"C136", name:"樱桃粉", rgb:[245,120,160] },
+  { id:"C137", name:"玫瑰粉", rgb:[240,135,170] },
+  { id:"C138", name:"山茶粉", rgb:[245,155,185] },
+  { id:"C139", name:"樱花粉", rgb:[255,185,205] },
+  { id:"C140", name:"裸粉", rgb:[235,180,185] },
+  { id:"C141", name:"肉粉", rgb:[240,190,190] },
+  { id:"C142", name:"浅藕", rgb:[230,195,200] },
+  { id:"C143", name:"贝壳粉", rgb:[250,210,215] },
+  { id:"C144", name:"粉白", rgb:[255,225,230] },
+  { id:"C145", name:"西柚粉", rgb:[250,165,170] },
+  { id:"C146", name:"胭脂粉", rgb:[235,130,150] },
+
+  // ── 棕色系 (147-168) ──
+  { id:"C147", name:"深棕", rgb:[90,55,35] },
+  { id:"C148", name:"咖啡棕", rgb:[120,75,45] },
+  { id:"C149", name:"巧克力棕", rgb:[105,55,35] },
+  { id:"C150", name:"中棕", rgb:[150,100,65] },
+  { id:"C151", name:"浅棕", rgb:[185,135,95] },
+  { id:"C152", name:"驼色", rgb:[195,155,115] },
+  { id:"C153", name:"卡其色", rgb:[200,170,130] },
+  { id:"C154", name:"米色", rgb:[225,205,170] },
+  { id:"C155", name:"杏色", rgb:[235,210,175] },
+  { id:"C156", name:"肤色", rgb:[245,210,185] },
+  { id:"C157", name:"浅肤色", rgb:[250,225,205] },
+  { id:"C158", name:"红棕", rgb:[160,80,50] },
+  { id:"C159", name:"栗色", rgb:[135,65,45] },
+  { id:"C160", name:"赭色", rgb:[185,120,65] },
+  { id:"C161", name:"陶土色", rgb:[200,120,85] },
+  { id:"C162", name:"肉桂色", rgb:[175,120,80] },
+  { id:"C163", name:"焦糖色", rgb:[190,135,80] },
+  { id:"C164", name:"太妃糖", rgb:[200,150,100] },
+  { id:"C165", name:"奶油杏", rgb:[235,200,165] },
+  { id:"C166", name:"沙色", rgb:[215,190,155] },
+  { id:"C167", name:"小麦色", rgb:[220,190,150] },
+  { id:"C168", name:"蜜糖色", rgb:[210,165,120] },
+
+  // ── 特殊色 / 珠光 / 荧光 / 透明系 (169-195) ──
+  { id:"C169", name:"荧光黄绿", rgb:[200,240,25] },
+  { id:"C170", name:"荧光青", rgb:[30,240,200] },
+  { id:"C171", name:"荧光白", rgb:[250,255,245] },
+  { id:"C172", name:"珠光白", rgb:[248,245,240] },
+  { id:"C173", name:"珠光粉", rgb:[250,210,220] },
+  { id:"C174", name:"珠光蓝", rgb:[180,210,240] },
+  { id:"C175", name:"珠光紫", rgb:[215,195,230] },
+  { id:"C176", name:"珠光金", rgb:[240,225,160] },
+  { id:"C177", name:"闪银", rgb:[215,215,220] },
+  { id:"C178", name:"闪金", rgb:[235,210,130] },
+  { id:"C179", name:"透明", rgb:[240,240,238] },
+  { id:"C180", name:"透明粉", rgb:[248,225,230] },
+  { id:"C181", name:"透明蓝", rgb:[220,235,248] },
+  { id:"C182", name:"透明黄", rgb:[250,248,220] },
+  { id:"C183", name:"透明绿", rgb:[220,242,228] },
+  { id:"C184", name:"透明紫", rgb:[238,228,245] },
+  { id:"C185", name:"透明橙", rgb:[250,235,218] },
+  { id:"C186", name:"夜光白", rgb:[240,248,235] },
+  { id:"C187", name:"夜光绿", rgb:[200,235,190] },
+  { id:"C188", name:"夜光蓝", rgb:[195,225,245] },
+  { id:"C189", name:"条纹粉白", rgb:[248,210,218] },
+  { id:"C190", name:"条纹蓝白", rgb:[210,225,245] },
+  { id:"C191", name:"大理石白", rgb:[238,236,232] },
+  { id:"C192", name:"大理石黑", rgb:[75,72,68] },
+  { id:"C193", name:"炫彩", rgb:[200,210,195] },
+  { id:"C194", name:"镭射银", rgb:[205,200,195] },
+  { id:"C195", name:"镭射金", rgb:[225,210,165] },
+
+  // ── 补充色 (196-221) ──
+  { id:"C196", name:"雾蓝", rgb:[170,190,215] },
+  { id:"C197", name:"雾粉", rgb:[225,190,200] },
+  { id:"C198", name:"雾绿", rgb:[175,200,180] },
+  { id:"C199", name:"雾紫", rgb:[200,185,210] },
+  { id:"C200", name:"深紫褐", rgb:[75,45,70] },
+  { id:"C201", name:"深蓝灰", rgb:[65,80,105] },
+  { id:"C202", name:"深绿灰", rgb:[70,90,75] },
+  { id:"C203", name:"暖灰", rgb:[170,160,150] },
+  { id:"C204", name:"冷灰", rgb:[155,160,170] },
+  { id:"C205", name:"豆绿", rgb:[175,210,155] },
+  { id:"C206", name:"灰绿", rgb:[140,170,135] },
+  { id:"C207", name:"孔雀蓝", rgb:[30,140,175] },
+  { id:"C208", name:"深孔雀绿", rgb:[20,130,125] },
+  { id:"C209", name:"深紫红", rgb:[150,35,80] },
+  { id:"C210", name:"深玫红", rgb:[175,30,90] },
+  { id:"C211", name:"西瓜红", rgb:[245,85,110] },
+  { id:"C212", name:"珊瑚粉", rgb:[250,130,130] },
+  { id:"C213", name:"橘粉", rgb:[250,145,125] },
+  { id:"C214", name:"淡黄绿", rgb:[210,225,120] },
+  { id:"C215", name:"橄榄褐", rgb:[140,130,75] },
+  { id:"C216", name:"灰褐", rgb:[145,125,105] },
+  { id:"C217", name:"深灰褐", rgb:[110,90,75] },
+  { id:"C218", name:"淡灰蓝", rgb:[175,185,205] },
+  { id:"C219", name:"淡灰紫", rgb:[190,182,198] },
+  { id:"C220", name:"象牙黄", rgb:[252,248,225] },
+  { id:"C221", name:"雪白", rgb:[248,250,252] },
+];
+
+// Fix the broken C211 entry above
+// (already corrected inline - C211 is now 西瓜红)
+
+// Build lookup map
+const paletteMap = {};
+MARD_PALETTE.forEach(c => { paletteMap[c.id] = c; });
+
+// ======================================================================
+// COLOR SPACE UTILITIES
+// ======================================================================
+
+/** RGB → XYZ (sRGB, D65) */
+function rgbToXyz(r, g, b) {
+  let vr = r / 255, vg = g / 255, vb = b / 255;
+  vr = vr > 0.04045 ? Math.pow((vr + 0.055) / 1.055, 2.4) : vr / 12.92;
+  vg = vg > 0.04045 ? Math.pow((vg + 0.055) / 1.055, 2.4) : vg / 12.92;
+  vb = vb > 0.04045 ? Math.pow((vb + 0.055) / 1.055, 2.4) : vb / 12.92;
+  return [
+    (vr * 0.4124564 + vg * 0.3575761 + vb * 0.1804375) * 100,
+    (vr * 0.2126729 + vg * 0.7151522 + vb * 0.0721750) * 100,
+    (vr * 0.0193339 + vg * 0.1191920 + vb * 0.9503041) * 100,
+  ];
+}
+
+/** XYZ → CIELAB (D65) */
+function xyzToLab(x, y, z) {
+  const xn = 95.047, yn = 100.0, zn = 108.883;
+  const fx = x / xn > 0.008856 ? Math.cbrt(x / xn) : (7.787 * (x / xn)) + (16 / 116);
+  const fy = y / yn > 0.008856 ? Math.cbrt(y / yn) : (7.787 * (y / yn)) + (16 / 116);
+  const fz = z / zn > 0.008856 ? Math.cbrt(z / zn) : (7.787 * (z / zn)) + (16 / 116);
+  return [
+    (116 * fy) - 16,
+    500 * (fx - fy),
+    200 * (fy - fz),
+  ];
+}
+
+/** RGB → CIELAB */
+function rgbToLab(r, g, b) {
+  const [x, y, z] = rgbToXyz(r, g, b);
+  return xyzToLab(x, y, z);
+}
+
+/** CIE76 ΔE (LAB Euclidean distance) */
+function deltaE(lab1, lab2) {
+  const dl = lab1[0] - lab2[0];
+  const da = lab1[1] - lab2[1];
+  const db = lab1[2] - lab2[2];
+  return Math.sqrt(dl * dl + da * da + db * db);
+}
+
+/** Weighted RGB distance (human-perception weighted) */
+function weightedRgbDist(r1, g1, b1, r2, g2, b2) {
+  const rMean = (r1 + r2) / 2;
+  const dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
+  return Math.sqrt(
+    ((512 + rMean) * dr * dr) / 256 +
+    4 * dg * dg +
+    ((767 - rMean) * db * db) / 256
+  );
+}
+
+/** Euclidean RGB distance */
+function euclideanRgbDist(r1, g1, b1, r2, g2, b2) {
+  const dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+// ======================================================================
+// COLOR MATCHING ENGINE
+// ======================================================================
+
+// Pre-compute LAB values for the entire palette
+const paletteLab = MARD_PALETTE.map(c => {
+  const [L, A, B] = rgbToLab(c.rgb[0], c.rgb[1], c.rgb[2]);
+  return { ...c, lab: [L, A, B] };
+});
+
+/**
+ * Find the closest palette color to a given RGB value.
+ * @param {number} r,g,b - pixel RGB
+ * @param {string} method - 'lab' | 'weighted' | 'euclidean'
+ * @returns {{ id, name, rgb }}
+ */
+function findClosestColor(r, g, b, method = 'lab') {
+  let best = null;
+  let bestDist = Infinity;
+
+  if (method === 'lab') {
+    const targetLab = rgbToLab(r, g, b);
+    for (const c of paletteLab) {
+      const d = deltaE(targetLab, c.lab);
+      if (d < bestDist) { bestDist = d; best = c; }
+    }
+  } else if (method === 'weighted') {
+    for (const c of MARD_PALETTE) {
+      const d = weightedRgbDist(r, g, b, c.rgb[0], c.rgb[1], c.rgb[2]);
+      if (d < bestDist) { bestDist = d; best = c; }
+    }
+  } else {
+    for (const c of MARD_PALETTE) {
+      const d = euclideanRgbDist(r, g, b, c.rgb[0], c.rgb[1], c.rgb[2]);
+      if (d < bestDist) { bestDist = d; best = c; }
+    }
+  }
+  return best;
+}
+
+// ======================================================================
+// IMAGE PROCESSING
+// ======================================================================
+
+/**
+ * Load image from file.
+ */
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const validTypes = /image\/(jpeg|png|webp)/;
+    const validExts = ['jpg', 'jpeg', 'png', 'webp'];
+    if (!validTypes.test(file.type) && !validExts.includes(ext)) {
+      reject(new Error('请上传 JPG / PNG / WebP 格式的图片'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('图片加载失败'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Resize & pixelate image to target grid size.
+ * Returns 2D array of {r,g,b} pixels.
+ */
+function pixelateImage(img, targetSize) {
+  // Determine output dimensions (maintaining aspect ratio)
+  const ratio = img.width / img.height;
+  let outW, outH;
+  if (ratio >= 1) {
+    outW = targetSize;
+    outH = Math.max(1, Math.round(targetSize / ratio));
+  } else {
+    outH = targetSize;
+    outW = Math.max(1, Math.round(targetSize * ratio));
+  }
+
+  // Draw resized image to offscreen canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  // Use pixelated rendering
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, 0, 0, outW, outH);
+
+  // Extract pixel data
+  const imageData = ctx.getImageData(0, 0, outW, outH);
+  const pixels = [];
+  for (let y = 0; y < outH; y++) {
+    const row = [];
+    for (let x = 0; x < outW; x++) {
+      const i = (y * outW + x) * 4;
+      row.push({
+        r: imageData.data[i],
+        g: imageData.data[i + 1],
+        b: imageData.data[i + 2],
+        a: imageData.data[i + 3],
+      });
+    }
+    pixels.push(row);
+  }
+  return { pixels, width: outW, height: outH };
+}
+
+/**
+ * Map pixel grid to color grid.
+ */
+function mapToColors(pixelGrid, method) {
+  const height = pixelGrid.length;
+  const width = pixelGrid[0].length;
+  const colorGrid = [];
+  for (let y = 0; y < height; y++) {
+    const row = [];
+    for (let x = 0; x < width; x++) {
+      const p = pixelGrid[y][x];
+      // Treat fully transparent / near-white transparent as white
+      if (p.a < 30) {
+        row.push(paletteMap['C01']); // white for transparent
+      } else {
+        row.push(findClosestColor(p.r, p.g, p.b, method));
+      }
+    }
+    colorGrid.push(row);
+  }
+  return colorGrid;
+}
+
+/**
+ * Count materials from color grid.
+ */
+function countMaterials(colorGrid) {
+  const counts = {};
+  for (const row of colorGrid) {
+    for (const cell of row) {
+      counts[cell.id] = (counts[cell.id] || 0) + 1;
+    }
+  }
+  // Sort by count descending
+  const sorted = Object.entries(counts)
+    .map(([id, count]) => ({ id, name: paletteMap[id]?.name || id, rgb: paletteMap[id]?.rgb || [128,128,128], count }))
+    .sort((a, b) => b.count - a.count);
+  return sorted;
+}
+
+// ======================================================================
+// RENDERING
+// ======================================================================
+
+/**
+ * Draw the bead grid canvas.
+ */
+function drawBeadGrid(canvas, colorGrid, { showGrid = true, showLabels = false } = {}) {
+  const height = colorGrid.length;
+  const width = colorGrid[0].length;
+
+  // Determine cell size to fit in a reasonable canvas
+  const maxCanvasSize = 750;
+  const cellSize = Math.max(3, Math.floor(maxCanvasSize / Math.max(width, height)));
+  const canvasW = width * cellSize;
+  const canvasH = height * cellSize;
+
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  const ctx = canvas.getContext('2d');
+
+  // Fill cells
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const c = colorGrid[y][x];
+      ctx.fillStyle = `rgb(${c.rgb[0]},${c.rgb[1]},${c.rgb[2]})`;
+      ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+
+      // Draw grid lines
+      if (showGrid && cellSize >= 4) {
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
+      }
+
+      // Draw color code label
+      if (showLabels && cellSize >= 16) {
+        ctx.fillStyle = getTextColor(c.rgb[0], c.rgb[1], c.rgb[2]);
+        ctx.font = `${Math.max(7, cellSize * 0.45)}px "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(c.id, x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
+      }
+    }
+  }
+  return { canvasW, canvasH, cellSize };
+}
+
+/**
+ * Determine whether to use light or dark text on a background color.
+ */
+function getTextColor(r, g, b) {
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.85)';
+}
+
+/**
+ * Draw pixelated preview.
+ */
+function drawPixelatedPreview(canvas, pixelGrid) {
+  const height = pixelGrid.length;
+  const width = pixelGrid[0].length;
+  const scale = Math.max(2, Math.floor(400 / Math.max(width, height)));
+
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = pixelGrid[y][x];
+      ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${p.a / 255})`;
+      ctx.fillRect(x * scale, y * scale, scale, scale);
+    }
+  }
+}
+
+// ======================================================================
+// DOWNLOAD UTILITIES
+// ======================================================================
+
+function downloadPNG(canvas, filename = 'bead-pattern.png') {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function downloadCSV(materials, filename = 'material-list.csv') {
+  // Add BOM for Excel UTF-8 compatibility
+  let csv = '﻿色号,名称,数量(颗)\n';
+  for (const m of materials) {
+    csv += `${m.id},${m.name},${m.count}\n`;
+  }
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+// ======================================================================
+// TOAST
+// ======================================================================
+
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ======================================================================
+// APPLICATION STATE
+// ======================================================================
+
+const state = {
+  originalImage: null,
+  pixelGrid: null,
+  colorGrid: null,
+  materials: null,
+  gridSize: 64,
+  matchMethod: 'lab',
+  showGrid: true,
+  showLabels: false,
+};
+
+// ======================================================================
+// DOM REFERENCES
+// ======================================================================
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+const uploadZone = $('#uploadZone');
+const fileInput = $('#fileInput');
+const controlsCard = $('#controlsCard');
+const panelsContainer = $('#panelsContainer');
+const materialsCard = $('#materialsCard');
+const originalPanel = $('#originalPanel');
+const pixelatedPanel = $('#pixelatedPanel');
+const beadGridPanel = $('#beadGridPanel');
+const gridInfo = $('#gridInfo');
+const materialGrid = $('#materialGrid');
+const summaryStats = $('#summaryStats');
+const customSizeInput = $('#customSize');
+const matchMethodSelect = $('#matchMethod');
+const toggleGrid = $('#toggleGrid');
+const toggleLabels = $('#toggleLabels');
+const downloadGridBtn = $('#downloadGridBtn');
+const downloadListBtn = $('#downloadListBtn');
+const resetBtn = $('#resetBtn');
+
+// ======================================================================
+// EVENT HANDLERS
+// ======================================================================
+
+/** Handle file upload */
+async function handleFile(file) {
+  console.log('📤 handleFile called, file:', file.name, 'type:', file.type, 'size:', file.size);
+  try {
+    showToast('正在处理图片...');
+    state.originalImage = await loadImage(file);
+    console.log('✅ Image loaded:', state.originalImage.width, 'x', state.originalImage.height);
+    await processAll();
+    console.log('✅ processAll completed');
+    showToast('✨ 拼豆图纸已生成！');
+  } catch (err) {
+    console.error('❌ handleFile error:', err);
+    showToast('❌ ' + err.message);
+  }
+}
+
+/** Run the full processing pipeline */
+async function processAll() {
+  if (!state.originalImage) {
+    console.warn('⚠️ processAll called but no originalImage');
+    return;
+  }
+
+  const img = state.originalImage;
+  const size = state.gridSize;
+  const method = state.matchMethod;
+
+  // 1. Pixelate
+  const { pixels, width, height } = pixelateImage(img, size);
+  state.pixelGrid = pixels;
+
+  // 2. Color mapping
+  state.colorGrid = mapToColors(pixels, method);
+
+  // 3. Count materials
+  state.materials = countMaterials(state.colorGrid);
+
+  // 4. Render everything
+  renderAll(width, height);
+}
+
+/** Render all UI panels */
+function renderAll(gridW, gridH) {
+  // Show cards
+  controlsCard.style.display = '';
+  panelsContainer.style.display = '';
+  materialsCard.style.display = '';
+
+  gridInfo.textContent = `${gridW} × ${gridH} 格`;
+
+  // ── Original image ──
+  originalPanel.innerHTML = '';
+  const origImg = document.createElement('img');
+  origImg.src = state.originalImage.src;
+  origImg.style.maxWidth = '100%';
+  origImg.style.maxHeight = '400px';
+  origImg.style.objectFit = 'contain';
+  origImg.style.borderRadius = '8px';
+  originalPanel.appendChild(origImg);
+
+  // ── Pixelated preview ──
+  pixelatedPanel.innerHTML = '';
+  const pixCanvas = document.createElement('canvas');
+  drawPixelatedPreview(pixCanvas, state.pixelGrid);
+  pixelatedPanel.appendChild(pixCanvas);
+
+  // ── Bead grid ──
+  beadGridPanel.innerHTML = '';
+  const beadCanvas = document.createElement('canvas');
+  beadCanvas.id = 'beadCanvas';
+  const { cellSize } = drawBeadGrid(beadCanvas, state.colorGrid, {
+    showGrid: state.showGrid,
+    showLabels: state.showLabels,
+  });
+  gridInfo.textContent = `${gridW} × ${gridH} 格 · 每格 ${cellSize}px`;
+  beadGridPanel.appendChild(beadCanvas);
+
+  // ── Material stats ──
+  const totalBeads = state.materials.reduce((s, m) => s + m.count, 0);
+  const uniqueColors = state.materials.length;
+  summaryStats.innerHTML = `
+    <div class="stat-item">
+      <div class="stat-value">${totalBeads.toLocaleString()}</div>
+      <div class="stat-label">总拼豆数</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">${uniqueColors}</div>
+      <div class="stat-label">使用颜色数</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">${gridW}×${gridH}</div>
+      <div class="stat-label">图纸尺寸</div>
+    </div>
+  `;
+
+  // ── Material list ──
+  materialGrid.innerHTML = '';
+  for (const m of state.materials) {
+    const item = document.createElement('div');
+    item.className = 'material-item';
+    item.innerHTML = `
+      <div class="material-swatch" style="background:rgb(${m.rgb[0]},${m.rgb[1]},${m.rgb[2]})"></div>
+      <span class="material-name" title="${m.id} ${m.name}">${m.id} ${m.name}</span>
+      <span class="material-count">${m.count}颗</span>
+    `;
+    materialGrid.appendChild(item);
+  }
+}
+
+// ── Upload events ──
+uploadZone.addEventListener('click', () => {
+  console.log('🖱️ Upload zone clicked, triggering file input');
+  fileInput.click();
+});
+uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => { uploadZone.classList.remove('drag-over'); });
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  console.log('📥 Drop event, file:', file ? file.name : 'none');
+  if (file) handleFile(file);
+});
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  console.log('📥 File input change, file:', file ? file.name : 'none');
+  if (file) handleFile(file);
+  fileInput.value = ''; // allow re-uploading same file
+});
+
+// ── Resolution buttons ──
+$$('.resolution-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.resolution-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    customSizeInput.value = '';
+    state.gridSize = parseInt(btn.dataset.size);
+    processAll();
+  });
+});
+
+// ── Custom size input ──
+customSizeInput.addEventListener('change', () => {
+  let val = parseInt(customSizeInput.value);
+  if (isNaN(val) || val < 4) val = 64;
+  if (val > 300) val = 300;
+  customSizeInput.value = val;
+  state.gridSize = val;
+  $$('.resolution-btn').forEach(b => b.classList.remove('active'));
+  processAll();
+});
+
+// ── Match method ──
+matchMethodSelect.addEventListener('change', () => {
+  state.matchMethod = matchMethodSelect.value;
+  processAll();
+});
+
+// ── Toggle switches ──
+toggleGrid.addEventListener('change', () => {
+  state.showGrid = toggleGrid.checked;
+  renderAll(state.pixelGrid[0].length, state.pixelGrid.length);
+});
+toggleLabels.addEventListener('change', () => {
+  state.showLabels = toggleLabels.checked;
+  renderAll(state.pixelGrid[0].length, state.pixelGrid.length);
+});
+
+// ── Download buttons ──
+downloadGridBtn.addEventListener('click', () => {
+  const canvas = document.getElementById('beadCanvas');
+  if (!canvas) { showToast('请先生成图纸'); return; }
+
+  // Create a high-res version for download (2x scale)
+  const hrCanvas = document.createElement('canvas');
+  drawBeadGrid(hrCanvas, state.colorGrid, {
+    showGrid: state.showGrid,
+    showLabels: state.showLabels,
+  });
+  // Actually use the same canvas - it's already good quality
+  downloadPNG(canvas, `bead-pattern-${state.pixelGrid[0].length}x${state.pixelGrid.length}.png`);
+  showToast('图纸已下载！');
+});
+
+downloadListBtn.addEventListener('click', () => {
+  if (!state.materials) { showToast('请先生成图纸'); return; }
+  downloadCSV(state.materials, `material-list-${state.pixelGrid[0].length}x${state.pixelGrid.length}.csv`);
+  showToast('材料清单已下载！');
+});
+
+// ── Reset ──
+resetBtn.addEventListener('click', () => {
+  state.originalImage = null;
+  state.pixelGrid = null;
+  state.colorGrid = null;
+  state.materials = null;
+  controlsCard.style.display = 'none';
+  panelsContainer.style.display = 'none';
+  materialsCard.style.display = 'none';
+  originalPanel.innerHTML = '<div class="empty-state"><span class="empty-state-icon">📷</span>等待上传</div>';
+  pixelatedPanel.innerHTML = '<div class="empty-state"><span class="empty-state-icon">🔲</span>等待处理</div>';
+  beadGridPanel.innerHTML = '<div class="empty-state"><span class="empty-state-icon">🧩</span>等待生成</div>';
+  materialGrid.innerHTML = '';
+  summaryStats.innerHTML = '';
+  showToast('已重置，可上传新图片');
+});
+
+// ── Keyboard shortcut ──
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's' && state.colorGrid) {
+    e.preventDefault();
+    const canvas = document.getElementById('beadCanvas');
+    if (canvas) downloadPNG(canvas);
+  }
+});
+
+// ======================================================================
+// INITIALIZATION
+// ======================================================================
+
+console.log('%c🖼️ Dopamine Beads 拼豆图纸生成器 %c已就绪',
+  'font-size:1.2em;font-weight:bold;color:#FFD93D;',
+  'color:#a0a0b8;');
+console.log(`%c📦 Mard 标准色库：${MARD_PALETTE.length} 色`, 'color:#00F5D4;');
+console.log('%c💡 提示：拖拽图片到上传区，或点击上传按钮', 'color:#FF4D6D;');
+console.log('%c⌨️ 快捷键：Ctrl+S 下载图纸', 'color:#a0a0b8;');
+
+// Visual confirmation that JS is running
+document.querySelector('.upload-text').textContent = '✅ JS已就绪 · 拖拽图片到此处，或点击上传';
+document.querySelector('.upload-zone').style.borderColor = 'rgba(0,245,212,0.5)';
+</script>
+
+</body>
+</html>

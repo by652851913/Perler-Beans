@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #FF4D6D;
+  --secondary: #FFD93D;
+  --accent: #00F5D4;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%);
+  color: #f0f0f0;
+  min-height: 100vh;
+}
+
+/* Animated background blobs */
+.bg-blobs {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+}
+.bg-blob {
+  position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.25;
+}
+.bg-blob:nth-child(1) {
+  width: 500px; height: 500px; background: var(--primary);
+  top: -150px; left: -100px; animation: blobFloat 20s ease-in-out infinite;
+}
+.bg-blob:nth-child(2) {
+  width: 400px; height: 400px; background: var(--secondary);
+  top: 40%; right: -120px; animation: blobFloat 20s ease-in-out infinite; animation-delay: -5s;
+}
+.bg-blob:nth-child(3) {
+  width: 450px; height: 450px; background: var(--accent);
+  bottom: -180px; left: 30%; animation: blobFloat 20s ease-in-out infinite; animation-delay: -10s;
+}
+@keyframes blobFloat {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  25% { transform: translate(60px,-40px) scale(1.08); }
+  50% { transform: translate(-30px,50px) scale(0.94); }
+  75% { transform: translate(-50px,-30px) scale(1.04); }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
